@@ -446,17 +446,10 @@ function renderDashboard(results, env, hasPasswordConfigured) {
         <!-- Account Resources (Workers & Pages) Section -->
         <div class="card-resources-section" id="resources-section-${res.account_id}" style="display: none;">
           <div class="resources-header">
-            <div class="resources-tabs">
-              <button class="resources-tab-btn active" id="tab-workers-btn-${res.account_id}" onclick="switchResourceTab('${res.account_id}', 'workers')">
-                <i class="ti ti-cpu"></i>
-                <span data-i18n="resources-workers">Workers</span>
-                <span class="resource-badge-count" id="count-workers-${res.account_id}">0</span>
-              </button>
-              <button class="resources-tab-btn" id="tab-pages-btn-${res.account_id}" onclick="switchResourceTab('${res.account_id}', 'pages')">
-                <i class="ti ti-file-code"></i>
-                <span data-i18n="resources-pages">Pages</span>
-                <span class="resource-badge-count" id="count-pages-${res.account_id}">0</span>
-              </button>
+            <div class="resources-header-title">
+              <i class="ti ti-apps"></i>
+              <span data-i18n="resources-title">Workers & Pages</span>
+              <span class="resource-badge-count" id="count-total-${res.account_id}">0</span>
             </div>
             <button class="resources-refresh-btn" onclick="fetchAccountResources('${res.account_id}', true)" title="Refresh Resources">
               <i class="ti ti-refresh" id="refresh-icon-${res.account_id}"></i>
@@ -1382,36 +1375,14 @@ function renderDashboard(results, env, hasPasswordConfigured) {
             margin-bottom: 0.6rem;
         }
 
-        .resources-tabs {
+        .resources-header-title {
             display: flex;
-            gap: 0.4rem;
             align-items: center;
-        }
-
-        .resources-tab-btn {
-            background: transparent;
-            border: 1px solid transparent;
-            color: var(--text-muted);
-            font-size: 0.75rem;
-            font-weight: 600;
-            padding: 0.25rem 0.6rem;
-            border-radius: 6px;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.35rem;
-            transition: all 0.2s ease;
-        }
-
-        .resources-tab-btn:hover {
-            color: var(--text-primary);
-            background: var(--btn-hover);
-        }
-
-        .resources-tab-btn.active {
+            gap: 0.45rem;
+            font-size: 0.78rem;
+            font-weight: 700;
             color: var(--text-highlight);
-            background: var(--btn-bg);
-            border-color: var(--border-color);
+            letter-spacing: -0.01em;
         }
 
         .resource-badge-count {
@@ -2575,8 +2546,10 @@ CF_ACCOUNT_NAME_1=main</p>
                 "btn-expand-all": "Expand All",
                 "btn-collapse-all": "Collapse All",
                 "resources-loading": "Loading resources...",
+                "resources-title": "Workers & Pages",
                 "resources-workers": "Workers",
                 "resources-pages": "Pages",
+                "resources-empty": "No Workers or Pages found.",
                 "resources-no-workers": "No Workers found.",
                 "resources-no-pages": "No Pages projects found.",
                 "resources-error": "Failed to load resources.",
@@ -2671,8 +2644,10 @@ CF_ACCOUNT_NAME_1=main</p>
                 "btn-expand-all": "باز کردن همه",
                 "btn-collapse-all": "جمع کردن همه",
                 "resources-loading": "در حال دریافت لیست ورکرها و پیج‌ها...",
+                "resources-title": "ورکرها و پیج‌ها",
                 "resources-workers": "ورکرها",
                 "resources-pages": "پیج‌ها",
+                "resources-empty": "هیچ ورکر یا پروژه‌ای در این اکانت یافت نشد.",
                 "resources-no-workers": "هیچ ورکری در این اکانت یافت نشد.",
                 "resources-no-pages": "هیچ پروژه Pages در این اکانت یافت نشد.",
                 "resources-error": "خطا در دریافت لیست منابع.",
@@ -3048,17 +3023,6 @@ CF_ACCOUNT_NAME_1=main</p>
             updateToggleAllState();
         }
 
-        function switchResourceTab(accountId, tabName) {
-            activeResourceTabs.set(accountId, tabName);
-            const workersBtn = document.getElementById('tab-workers-btn-' + accountId);
-            const pagesBtn = document.getElementById('tab-pages-btn-' + accountId);
-
-            if (workersBtn) workersBtn.classList.toggle('active', tabName === 'workers');
-            if (pagesBtn) pagesBtn.classList.toggle('active', tabName === 'pages');
-
-            renderAccountResources(accountId);
-        }
-
         async function fetchAccountResources(accountId, forceRefresh = false) {
             const bodyEl = document.getElementById('resources-body-' + accountId);
             const refreshIcon = document.getElementById('refresh-icon-' + accountId);
@@ -3093,60 +3057,57 @@ CF_ACCOUNT_NAME_1=main</p>
 
         function renderAccountResources(accountId) {
             const bodyEl = document.getElementById('resources-body-' + accountId);
-            const countWorkersEl = document.getElementById('count-workers-' + accountId);
-            const countPagesEl = document.getElementById('count-pages-' + accountId);
+            const countTotalEl = document.getElementById('count-total-' + accountId);
             if (!bodyEl) return;
 
-            const data = cachedAccountResources.get(accountId) || { workers: [], pages: [] };
+            const data = cachedAccountResources.get(accountId) || { subdomain: "", workers: [], pages: [] };
             const workers = data.workers || [];
             const pages = data.pages || [];
+            const accountSubdomain = data.subdomain || "";
+            const totalCount = workers.length + pages.length;
 
-            if (countWorkersEl) countWorkersEl.textContent = formatDigits(workers.length, currentLang);
-            if (countPagesEl) countPagesEl.textContent = formatDigits(pages.length, currentLang);
+            if (countTotalEl) countTotalEl.textContent = formatDigits(totalCount, currentLang);
 
-            const activeTab = activeResourceTabs.get(accountId) || 'workers';
-
-            if (activeTab === 'workers') {
-                if (workers.length === 0) {
-                    bodyEl.innerHTML = '<div class="resources-empty-state"><i class="ti ti-box"></i> ' +
-                        translations[currentLang]["resources-no-workers"] + '</div>';
-                    return;
-                }
-
-                let html = '<div class="resources-grid">';
-                workers.forEach(w => {
-                    const workerUrl = 'https://dash.cloudflare.com/' + accountId + '/workers/services/view/' + encodeURIComponent(w.id);
-                    html += '<a href="' + workerUrl + '" target="_blank" rel="noopener" class="resource-item-card" title="Worker: ' + w.id + '">' +
-                        '<div class="resource-item-info">' +
-                        '<i class="ti ti-cpu resource-item-icon"></i>' +
-                        '<span class="resource-item-name">' + w.id + '</span>' +
-                        '</div>' +
-                        '<i class="ti ti-external-link resource-link-arrow"></i>' +
-                        '</a>';
-                });
-                html += '</div>';
-                bodyEl.innerHTML = html;
-            } else {
-                if (pages.length === 0) {
-                    bodyEl.innerHTML = '<div class="resources-empty-state"><i class="ti ti-browser"></i> ' +
-                        translations[currentLang]["resources-no-pages"] + '</div>';
-                    return;
-                }
-
-                let html = '<div class="resources-grid">';
-                pages.forEach(p => {
-                    const pageUrl = p.subdomain ? ('https://' + p.subdomain) : ('https://dash.cloudflare.com/' + accountId + '/pages/view/' + encodeURIComponent(p.name));
-                    html += '<a href="' + pageUrl + '" target="_blank" rel="noopener" class="resource-item-card" title="Pages Project: ' + p.name + '">' +
-                        '<div class="resource-item-info">' +
-                        '<i class="ti ti-file-code resource-item-icon" style="color: var(--accent-cyan);"></i>' +
-                        '<span class="resource-item-name">' + p.name + '</span>' +
-                        '</div>' +
-                        '<i class="ti ti-external-link resource-link-arrow"></i>' +
-                        '</a>';
-                });
-                html += '</div>';
-                bodyEl.innerHTML = html;
+            if (totalCount === 0) {
+                bodyEl.innerHTML = '<div class="resources-empty-state"><i class="ti ti-box"></i> ' +
+                    translations[currentLang]["resources-empty"] + '</div>';
+                return;
             }
+
+            let html = '<div class="resources-grid">';
+
+            // 1. Render Workers
+            workers.forEach(w => {
+                const deployUrl = accountSubdomain
+                    ? ('https://' + encodeURIComponent(w.id) + '.' + accountSubdomain + '.workers.dev')
+                    : ('https://dash.cloudflare.com/' + accountId + '/workers/services/view/' + encodeURIComponent(w.id));
+
+                html += '<a href="' + deployUrl + '" target="_blank" rel="noopener" class="resource-item-card" title="Worker: ' + w.id + '">' +
+                    '<div class="resource-item-info">' +
+                    '<i class="ti ti-cpu resource-item-icon"></i>' +
+                    '<span class="resource-item-name">' + w.id + '</span>' +
+                    '</div>' +
+                    '<i class="ti ti-arrow-up-right resource-link-arrow"></i>' +
+                    '</a>';
+            });
+
+            // 2. Render Pages
+            pages.forEach(p => {
+                const pageUrl = p.subdomain
+                    ? ('https://' + p.subdomain)
+                    : ('https://dash.cloudflare.com/' + accountId + '/pages/view/' + encodeURIComponent(p.name));
+
+                html += '<a href="' + pageUrl + '" target="_blank" rel="noopener" class="resource-item-card" title="Pages: ' + p.name + '">' +
+                    '<div class="resource-item-info">' +
+                    '<i class="ti ti-file-code resource-item-icon" style="color: var(--accent-cyan);"></i>' +
+                    '<span class="resource-item-name">' + p.name + '</span>' +
+                    '</div>' +
+                    '<i class="ti ti-arrow-up-right resource-link-arrow"></i>' +
+                    '</a>';
+            });
+
+            html += '</div>';
+            bodyEl.innerHTML = html;
         }
 
         function updateToggleAllState() {
@@ -3851,6 +3812,18 @@ async function purgeEdgeCache(request) {
 
 export default {
   async fetch(request, env, ctx) {
+    try {
+      return await handleRequest(request, env, ctx);
+    } catch (unhandledErr) {
+      return new Response("APPLICATION_ERROR: " + unhandledErr.stack + " | " + unhandledErr.message, {
+        status: 500,
+        headers: { "Content-Type": "text/plain; charset=utf-8" }
+      });
+    }
+  }
+};
+
+async function handleRequest(request, env, ctx) {
     const url = new URL(request.url);
 
     // Only serve root endpoint or favicon or APIs
@@ -4068,13 +4041,25 @@ export default {
         "Content-Type": "application/json"
       };
 
-      // Fetch workers and pages in parallel with graceful error handling
-      const [workersRes, pagesRes] = await Promise.allSettled([
+      // Fetch workers, pages, and account subdomain in parallel with graceful error handling
+      const [workersRes, pagesRes, subdomainRes] = await Promise.allSettled([
         fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts`, { headers }),
-        fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects`, { headers })
+        fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects`, { headers }),
+        fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/subdomain`, { headers })
       ]);
 
+      let accountSubdomain = "";
+      if (subdomainRes.status === "fulfilled" && subdomainRes.value.ok) {
+        try {
+          const sData = await subdomainRes.value.json();
+          if (sData.success && sData.result?.subdomain) {
+            accountSubdomain = sData.result.subdomain;
+          }
+        } catch (e) {}
+      }
+
       const result = {
+        subdomain: accountSubdomain,
         workers: [],
         pages: []
       };
@@ -4228,5 +4213,4 @@ export default {
     }
 
     return response;
-  }
-};
+}
