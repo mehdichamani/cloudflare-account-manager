@@ -374,6 +374,9 @@ function renderDashboard(results, env, hasPasswordConfigured) {
         <div class="card-accent-bar" style="background: ${barGradient};"></div>
         <div class="card-header">
           <div class="account-title">
+            <button class="card-collapse-btn" onclick="toggleCardCollapse('${res.account_id}')" title="Toggle Details" aria-expanded="false" id="collapse-btn-${res.account_id}">
+              <i class="ti ti-chevron-right collapse-arrow"></i>
+            </button>
             <div class="account-avatar">
               <span>${initials}</span>
             </div>
@@ -405,7 +408,7 @@ function renderDashboard(results, env, hasPasswordConfigured) {
         ${errBadge}
 
         <!-- Compact Note & Links Combined Section -->
-        <div class="card-meta-section">
+        <div class="card-meta-section" id="meta-section-${res.account_id}">
           <div class="note-container" id="note-container-${res.account_id}">
             <div class="note-header-row">
               <div class="note-label">
@@ -419,7 +422,7 @@ function renderDashboard(results, env, hasPasswordConfigured) {
             </div>
             <div class="note-content ${!noteText ? 'note-empty-state' : ''}" onclick="enableNoteEdit('${res.account_id}')" id="note-display-${res.account_id}">${noteText || "No notes added yet."}</div>
             <div class="note-edit-wrapper" id="note-edit-wrapper-${res.account_id}" style="display: none; width: 100%;">
-              <textarea class="note-input" id="note-input-${res.account_id}" rows="2" placeholder="Add notes here...">${meta.note || ""}</textarea>
+              <textarea class="note-input" id="note-input-${res.account_id}" rows="3" placeholder="Add notes here...">${meta.note || ""}</textarea>
               <div class="note-actions">
                 <button class="btn btn-sm note-cancel-btn" onclick="cancelNoteEdit('${res.account_id}')">
                   <i class="ti ti-x"></i>
@@ -1252,14 +1255,74 @@ function renderDashboard(results, env, hasPasswordConfigured) {
             font-weight: 500;
         }
 
-        /* Compact Note & Links Section inside Card */
+        /* Card Collapse & Toggle */
+        .card-collapse-btn {
+            background: var(--btn-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            flex-shrink: 0;
+            padding: 0;
+        }
+
+        .card-collapse-btn:hover {
+            color: var(--cf-orange);
+            background: var(--btn-hover);
+            border-color: rgba(243, 128, 32, 0.4);
+            transform: scale(1.05);
+        }
+
+        .collapse-arrow {
+            font-size: 0.95rem;
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            display: inline-block;
+        }
+
+        .card-collapse-btn.expanded .collapse-arrow {
+            transform: rotate(90deg);
+            color: var(--cf-orange);
+        }
+
+        [dir="rtl"] .collapse-arrow {
+            transform: scaleX(-1);
+        }
+
+        [dir="rtl"] .card-collapse-btn.expanded .collapse-arrow {
+            transform: scaleX(-1) rotate(-90deg);
+            color: var(--cf-orange);
+        }
+
+        /* Compact Note & Links Section inside Card (Default Hidden) */
         .card-meta-section {
             margin-top: 0.85rem;
             border-top: 1px solid var(--border-color);
             padding-top: 0.75rem;
-            display: flex;
+            display: none;
             align-items: stretch;
             gap: 0.75rem;
+            animation: fadeInMeta 0.2s ease forwards;
+        }
+
+        .card-meta-section.expanded {
+            display: flex;
+        }
+
+        @keyframes fadeInMeta {
+            from {
+                opacity: 0;
+                transform: translateY(-4px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         @media (max-width: 680px) {
@@ -1336,14 +1399,13 @@ function renderDashboard(results, env, hasPasswordConfigured) {
         .note-content {
             font-size: 0.82rem;
             color: var(--text-primary);
-            line-height: 1.4;
+            line-height: 1.5;
             cursor: pointer;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
+            white-space: pre-wrap;
             word-break: break-word;
             overflow-wrap: anywhere;
+            max-height: 180px;
+            overflow-y: auto;
         }
 
         .note-empty-state {
@@ -2057,6 +2119,12 @@ function renderDashboard(results, env, hasPasswordConfigured) {
                 <i class="ti ti-layout-grid"></i>
                 <span data-i18n="breakdown-title">Account Usage Breakdown</span>
             </div>
+            <div class="section-actions">
+                <button class="header-pill-btn" id="toggle-all-cards-btn" onclick="toggleAllCards()" title="Expand or Collapse All Details">
+                    <i class="ti ti-arrows-maximize" id="toggle-all-cards-icon"></i>
+                    <span id="toggle-all-cards-text" data-i18n="btn-expand-all">Expand All</span>
+                </button>
+            </div>
         </div>
 
         ${emptyStateHtml}
@@ -2247,7 +2315,7 @@ CF_ACCOUNT_NAME_1=main</p>
                     <label class="form-label" for="account-token-input" data-i18n="account-token-label">Cloudflare API Token</label>
                     <input type="password" class="form-control" id="account-token-input" placeholder="••••••••••••••••••••••••••••••••" />
                     <div class="form-help-text" data-i18n-html="account-token-help">
-                        Recommended: <a href="https://dash.cloudflare.com/profile/api-tokens?accountId=%2A&name=cf-usage&permissionGroupKeys=%5B%7B%22key%22%3A%22account_analytics%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22workers_scripts%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22user_details%22%2C%22type%22%3A%22read%22%7D%5D&zoneId=all" target="_blank" rel="noopener">Quick One-Click Token Setup</a> or <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noopener">Manual Setup</a>.
+                        Recommended: <a href="https://dash.cloudflare.com/profile/api-tokens?accountId=%2A&name=cf-usage&permissionGroupKeys=%5B%7B%22key%22%3A%22user_details%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22account_analytics%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22workers_scripts%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22page%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22workers_kv_storage%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22d1%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22zone%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22dns%22%2C%22type%22%3A%22read%22%7D%5D&zoneId=all" target="_blank" rel="noopener">Quick One-Click Token Setup</a> or <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noopener">Manual Setup</a>.
                     </div>
                 </div>
                 <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1.25rem;">
@@ -2308,6 +2376,8 @@ CF_ACCOUNT_NAME_1=main</p>
                 "metric-free": "Total Free Quota",
                 "metric-usage": "Overall Usage",
                 "breakdown-title": "Account Usage Breakdown",
+                "btn-expand-all": "Expand All",
+                "btn-collapse-all": "Collapse All",
                 "usage-invocations": "Invocations Today",
                 "note-label": "Account Notes",
                 "edit-note": "Edit",
@@ -2375,7 +2445,7 @@ CF_ACCOUNT_NAME_1=main</p>
                 "alert-import-success": "Accounts successfully imported from .env!",
                 "alert-export-failed": "Failed to fetch accounts config to export: ",
                 "account-id-help": "Find your Account ID on your <a href=\\\"https://dash.cloudflare.com/\\\" target=\\\"_blank\\\" rel=\\\"noopener\\\">Cloudflare Dashboard</a>",
-                "account-token-help": "Recommended: <a href=\\\"https://dash.cloudflare.com/profile/api-tokens?accountId=%2A&name=cf-usage&permissionGroupKeys=%5B%7B%22key%22%3A%22account_analytics%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22workers_scripts%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22user_details%22%2C%22type%22%3A%22read%22%7D%5D&zoneId=all\\\" target=\\\"_blank\\\" rel=\\\"noopener\\\">Quick One-Click Token Setup</a> or <a href=\\\"https://dash.cloudflare.com/profile/api-tokens\\\" target=\\\"_blank\\\" rel=\\\"noopener\\\">Manual Setup</a>."
+                "account-token-help": "Recommended: <a href=\\\"https://dash.cloudflare.com/profile/api-tokens?accountId=%2A&name=cf-usage&permissionGroupKeys=%5B%7B%22key%22%3A%22user_details%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22account_analytics%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22workers_scripts%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22page%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22workers_kv_storage%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22d1%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22zone%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22dns%22%2C%22type%22%3A%22read%22%7D%5D&zoneId=all\\\" target=\\\"_blank\\\" rel=\\\"noopener\\\">Quick One-Click Token Setup</a> or <a href=\\\"https://dash.cloudflare.com/profile/api-tokens\\\" target=\\\"_blank\\\" rel=\\\"noopener\\\">Manual Setup</a>."
             },
             "fa": {
                 "brand-title": "میزان مصرف ورکرز کلودفلر",
@@ -2395,6 +2465,8 @@ CF_ACCOUNT_NAME_1=main</p>
                 "metric-free": "مجموع سهمیه رایگان",
                 "metric-usage": "میزان کل مصرف",
                 "breakdown-title": "جزئیات مصرف اکانت‌ها",
+                "btn-expand-all": "باز کردن همه",
+                "btn-collapse-all": "جمع کردن همه",
                 "usage-invocations": "درخواست‌های امروز",
                 "note-label": "یادداشت‌های اکانت",
                 "edit-note": "ویرایش",
@@ -2462,7 +2534,7 @@ CF_ACCOUNT_NAME_1=main</p>
                 "alert-import-success": "اکانت‌ها با موفقیت از .env وارد شدند!",
                 "alert-export-failed": "خطا در دریافت پیکربندی اکانت‌ها برای خروجی: ",
                 "account-id-help": "شناسه اکانت خود را در <a href=\\\"https://dash.cloudflare.com/\\\" target=\\\"_blank\\\" rel=\\\"noopener\\\">داشبورد کلودفلر</a> پیدا کنید.",
-                "account-token-help": "پیشنهاد شده: <a href=\\\"https://dash.cloudflare.com/profile/api-tokens?accountId=%2A&name=cf-usage&permissionGroupKeys=%5B%7B%22key%22%3A%22account_analytics%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22workers_scripts%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22user_details%22%2C%22type%22%3A%22read%22%7D%5D&zoneId=all\\\" target=\\\"_blank\\\" rel=\\\"noopener\\\">ساخت سریع توکن (با یک کلیک)</a> یا <a href=\\\"https://dash.cloudflare.com/profile/api-tokens\\\" target=\\\"_blank\\\" rel=\\\"noopener\\\">تنظیم دستی</a>."
+                "account-token-help": "پیشنهاد شده: <a href=\\\"https://dash.cloudflare.com/profile/api-tokens?accountId=%2A&name=cf-usage&permissionGroupKeys=%5B%7B%22key%22%3A%22user_details%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22account_analytics%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22workers_scripts%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22page%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22workers_kv_storage%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22d1%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22zone%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22dns%22%2C%22type%22%3A%22read%22%7D%5D&zoneId=all\\\" target=\\\"_blank\\\" rel=\\\"noopener\\\">ساخت سریع توکن (با یک کلیک)</a> یا <a href=\\\"https://dash.cloudflare.com/profile/api-tokens\\\" target=\\\"_blank\\\" rel=\\\"noopener\\\">تنظیم دستی</a>."
             }
         };
 
@@ -2739,6 +2811,64 @@ CF_ACCOUNT_NAME_1=main</p>
         }
 
         setInterval(updateUtcResetBar, 1000);
+
+        // Card Collapse & Expand Logic
+        let areAllCardsExpanded = false;
+
+        function toggleCardCollapse(accountId) {
+            const metaSec = document.getElementById('meta-section-' + accountId);
+            const btn = document.getElementById('collapse-btn-' + accountId);
+            if (!metaSec || !btn) return;
+
+            const isExpanding = !metaSec.classList.contains('expanded');
+            metaSec.classList.toggle('expanded', isExpanding);
+            btn.classList.toggle('expanded', isExpanding);
+            btn.setAttribute('aria-expanded', isExpanding ? 'true' : 'false');
+
+            updateToggleAllState();
+        }
+
+        function updateToggleAllState() {
+            const allMetaSections = document.querySelectorAll('#account-cards-container .card-meta-section');
+            if (allMetaSections.length === 0) return;
+
+            const expandedCount = document.querySelectorAll('#account-cards-container .card-meta-section.expanded').length;
+            areAllCardsExpanded = (expandedCount === allMetaSections.length);
+
+            const toggleBtnText = document.getElementById('toggle-all-cards-text');
+            const toggleBtnIcon = document.getElementById('toggle-all-cards-icon');
+            if (toggleBtnText && toggleBtnIcon) {
+                if (areAllCardsExpanded) {
+                    toggleBtnText.setAttribute('data-i18n', 'btn-collapse-all');
+                    toggleBtnText.textContent = translations[currentLang]['btn-collapse-all'];
+                    toggleBtnIcon.className = 'ti ti-arrows-minimize';
+                } else {
+                    toggleBtnText.setAttribute('data-i18n', 'btn-expand-all');
+                    toggleBtnText.textContent = translations[currentLang]['btn-expand-all'];
+                    toggleBtnIcon.className = 'ti ti-arrows-maximize';
+                }
+            }
+        }
+
+        function toggleAllCards() {
+            const targetExpand = !areAllCardsExpanded;
+            const cards = document.querySelectorAll('#account-cards-container .card');
+
+            cards.forEach(card => {
+                const accountId = card.getAttribute('data-account-id');
+                const metaSec = document.getElementById('meta-section-' + accountId);
+                const btn = document.getElementById('collapse-btn-' + accountId);
+
+                if (metaSec && btn) {
+                    metaSec.classList.toggle('expanded', targetExpand);
+                    btn.classList.toggle('expanded', targetExpand);
+                    btn.setAttribute('aria-expanded', targetExpand ? 'true' : 'false');
+                }
+            });
+
+            areAllCardsExpanded = targetExpand;
+            updateToggleAllState();
+        }
 
         // Search and Filter logic
         let activeFilter = 'all';
