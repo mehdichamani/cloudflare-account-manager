@@ -442,6 +442,34 @@ function renderDashboard(results, env, hasPasswordConfigured) {
             </div>
           </div>
         </div>
+
+        <!-- Account Resources (Workers & Pages) Section -->
+        <div class="card-resources-section" id="resources-section-${res.account_id}" style="display: none;">
+          <div class="resources-header">
+            <div class="resources-tabs">
+              <button class="resources-tab-btn active" id="tab-workers-btn-${res.account_id}" onclick="switchResourceTab('${res.account_id}', 'workers')">
+                <i class="ti ti-cpu"></i>
+                <span data-i18n="resources-workers">Workers</span>
+                <span class="resource-badge-count" id="count-workers-${res.account_id}">0</span>
+              </button>
+              <button class="resources-tab-btn" id="tab-pages-btn-${res.account_id}" onclick="switchResourceTab('${res.account_id}', 'pages')">
+                <i class="ti ti-file-code"></i>
+                <span data-i18n="resources-pages">Pages</span>
+                <span class="resource-badge-count" id="count-pages-${res.account_id}">0</span>
+              </button>
+            </div>
+            <button class="resources-refresh-btn" onclick="fetchAccountResources('${res.account_id}', true)" title="Refresh Resources">
+              <i class="ti ti-refresh" id="refresh-icon-${res.account_id}"></i>
+            </button>
+          </div>
+
+          <div class="resources-body" id="resources-body-${res.account_id}">
+            <div class="resources-loading-state">
+              <i class="ti ti-loader-2 spin-icon"></i>
+              <span data-i18n="resources-loading">Loading resources...</span>
+            </div>
+          </div>
+        </div>
       </div>
     `;
   }
@@ -1329,6 +1357,174 @@ function renderDashboard(results, env, hasPasswordConfigured) {
             .card-meta-section {
                 flex-direction: column;
             }
+        }
+
+        /* Account Resources (Workers & Pages) UI */
+        .card-resources-section {
+            margin-top: 0.75rem;
+            background: rgba(0, 0, 0, 0.12);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 0.65rem 0.85rem;
+            animation: fadeInMeta 0.25s ease forwards;
+        }
+
+        :root.theme-light .card-resources-section {
+            background: rgba(0, 0, 0, 0.03);
+        }
+
+        .resources-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.45rem;
+            margin-bottom: 0.6rem;
+        }
+
+        .resources-tabs {
+            display: flex;
+            gap: 0.4rem;
+            align-items: center;
+        }
+
+        .resources-tab-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.25rem 0.6rem;
+            border-radius: 6px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            transition: all 0.2s ease;
+        }
+
+        .resources-tab-btn:hover {
+            color: var(--text-primary);
+            background: var(--btn-hover);
+        }
+
+        .resources-tab-btn.active {
+            color: var(--text-highlight);
+            background: var(--btn-bg);
+            border-color: var(--border-color);
+        }
+
+        .resource-badge-count {
+            background: rgba(243, 128, 32, 0.15);
+            color: var(--cf-orange);
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 0.05rem 0.35rem;
+            border-radius: 9999px;
+        }
+
+        .resources-refresh-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            width: 24px;
+            height: 24px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .resources-refresh-btn:hover {
+            color: var(--cf-orange);
+            background: var(--btn-hover);
+        }
+
+        .resources-loading-state, .resources-empty-state, .resources-error-state {
+            padding: 0.85rem;
+            text-align: center;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.45rem;
+        }
+
+        .resources-error-state {
+            color: #ef4444;
+        }
+
+        .spin-icon {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .resources-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 0.5rem;
+        }
+
+        .resource-item-card {
+            background: var(--btn-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.45rem 0.65rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .resource-item-card:hover {
+            border-color: rgba(243, 128, 32, 0.4);
+            background: var(--btn-hover);
+            transform: translateY(-1px);
+        }
+
+        .resource-item-info {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .resource-item-icon {
+            font-size: 0.95rem;
+            color: var(--cf-orange);
+            flex-shrink: 0;
+        }
+
+        .resource-item-name {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .resource-link-arrow {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            flex-shrink: 0;
+            opacity: 0.6;
+        }
+
+        .resource-item-card:hover .resource-link-arrow {
+            color: var(--cf-orange);
+            opacity: 1;
         }
 
         .note-container {
@@ -2378,6 +2574,13 @@ CF_ACCOUNT_NAME_1=main</p>
                 "breakdown-title": "Account Usage Breakdown",
                 "btn-expand-all": "Expand All",
                 "btn-collapse-all": "Collapse All",
+                "resources-loading": "Loading resources...",
+                "resources-workers": "Workers",
+                "resources-pages": "Pages",
+                "resources-no-workers": "No Workers found.",
+                "resources-no-pages": "No Pages projects found.",
+                "resources-error": "Failed to load resources.",
+                "resources-refresh": "Refresh resources",
                 "usage-invocations": "Invocations Today",
                 "note-label": "Account Notes",
                 "edit-note": "Edit",
@@ -2467,6 +2670,13 @@ CF_ACCOUNT_NAME_1=main</p>
                 "breakdown-title": "جزئیات مصرف اکانت‌ها",
                 "btn-expand-all": "باز کردن همه",
                 "btn-collapse-all": "جمع کردن همه",
+                "resources-loading": "در حال دریافت لیست ورکرها و پیج‌ها...",
+                "resources-workers": "ورکرها",
+                "resources-pages": "پیج‌ها",
+                "resources-no-workers": "هیچ ورکری در این اکانت یافت نشد.",
+                "resources-no-pages": "هیچ پروژه Pages در این اکانت یافت نشد.",
+                "resources-error": "خطا در دریافت لیست منابع.",
+                "resources-refresh": "به‌روزرسانی منابع",
                 "usage-invocations": "درخواست‌های امروز",
                 "note-label": "یادداشت‌های اکانت",
                 "edit-note": "ویرایش",
@@ -2814,18 +3024,129 @@ CF_ACCOUNT_NAME_1=main</p>
 
         // Card Collapse & Expand Logic
         let areAllCardsExpanded = false;
+        const cachedAccountResources = new Map();
+        const activeResourceTabs = new Map();
 
         function toggleCardCollapse(accountId) {
             const metaSec = document.getElementById('meta-section-' + accountId);
+            const resourcesSec = document.getElementById('resources-section-' + accountId);
             const btn = document.getElementById('collapse-btn-' + accountId);
             if (!metaSec || !btn) return;
 
             const isExpanding = !metaSec.classList.contains('expanded');
             metaSec.classList.toggle('expanded', isExpanding);
+            if (resourcesSec) {
+                resourcesSec.style.display = isExpanding ? 'block' : 'none';
+            }
             btn.classList.toggle('expanded', isExpanding);
             btn.setAttribute('aria-expanded', isExpanding ? 'true' : 'false');
 
+            if (isExpanding) {
+                fetchAccountResources(accountId);
+            }
+
             updateToggleAllState();
+        }
+
+        function switchResourceTab(accountId, tabName) {
+            activeResourceTabs.set(accountId, tabName);
+            const workersBtn = document.getElementById('tab-workers-btn-' + accountId);
+            const pagesBtn = document.getElementById('tab-pages-btn-' + accountId);
+
+            if (workersBtn) workersBtn.classList.toggle('active', tabName === 'workers');
+            if (pagesBtn) pagesBtn.classList.toggle('active', tabName === 'pages');
+
+            renderAccountResources(accountId);
+        }
+
+        async function fetchAccountResources(accountId, forceRefresh = false) {
+            const bodyEl = document.getElementById('resources-body-' + accountId);
+            const refreshIcon = document.getElementById('refresh-icon-' + accountId);
+
+            if (!forceRefresh && cachedAccountResources.has(accountId)) {
+                renderAccountResources(accountId);
+                return;
+            }
+
+            if (refreshIcon) refreshIcon.classList.add('spin-icon');
+            if (bodyEl) {
+                bodyEl.innerHTML = '<div class="resources-loading-state"><i class="ti ti-loader-2 spin-icon"></i> ' +
+                    translations[currentLang]["resources-loading"] + '</div>';
+            }
+
+            try {
+                const res = await fetch('/api/account-resources?account_id=' + accountId + (forceRefresh ? '&refresh=1' : ''));
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+
+                cachedAccountResources.set(accountId, data);
+                renderAccountResources(accountId);
+            } catch (err) {
+                if (bodyEl) {
+                    bodyEl.innerHTML = '<div class="resources-error-state"><i class="ti ti-alert-circle"></i> ' +
+                        translations[currentLang]["resources-error"] + '</div>';
+                }
+            } finally {
+                if (refreshIcon) refreshIcon.classList.remove('spin-icon');
+            }
+        }
+
+        function renderAccountResources(accountId) {
+            const bodyEl = document.getElementById('resources-body-' + accountId);
+            const countWorkersEl = document.getElementById('count-workers-' + accountId);
+            const countPagesEl = document.getElementById('count-pages-' + accountId);
+            if (!bodyEl) return;
+
+            const data = cachedAccountResources.get(accountId) || { workers: [], pages: [] };
+            const workers = data.workers || [];
+            const pages = data.pages || [];
+
+            if (countWorkersEl) countWorkersEl.textContent = formatDigits(workers.length, currentLang);
+            if (countPagesEl) countPagesEl.textContent = formatDigits(pages.length, currentLang);
+
+            const activeTab = activeResourceTabs.get(accountId) || 'workers';
+
+            if (activeTab === 'workers') {
+                if (workers.length === 0) {
+                    bodyEl.innerHTML = '<div class="resources-empty-state"><i class="ti ti-box"></i> ' +
+                        translations[currentLang]["resources-no-workers"] + '</div>';
+                    return;
+                }
+
+                let html = '<div class="resources-grid">';
+                workers.forEach(w => {
+                    const workerUrl = 'https://dash.cloudflare.com/' + accountId + '/workers/services/view/' + encodeURIComponent(w.id);
+                    html += '<a href="' + workerUrl + '" target="_blank" rel="noopener" class="resource-item-card" title="Worker: ' + w.id + '">' +
+                        '<div class="resource-item-info">' +
+                        '<i class="ti ti-cpu resource-item-icon"></i>' +
+                        '<span class="resource-item-name">' + w.id + '</span>' +
+                        '</div>' +
+                        '<i class="ti ti-external-link resource-link-arrow"></i>' +
+                        '</a>';
+                });
+                html += '</div>';
+                bodyEl.innerHTML = html;
+            } else {
+                if (pages.length === 0) {
+                    bodyEl.innerHTML = '<div class="resources-empty-state"><i class="ti ti-browser"></i> ' +
+                        translations[currentLang]["resources-no-pages"] + '</div>';
+                    return;
+                }
+
+                let html = '<div class="resources-grid">';
+                pages.forEach(p => {
+                    const pageUrl = p.subdomain ? ('https://' + p.subdomain) : ('https://dash.cloudflare.com/' + accountId + '/pages/view/' + encodeURIComponent(p.name));
+                    html += '<a href="' + pageUrl + '" target="_blank" rel="noopener" class="resource-item-card" title="Pages Project: ' + p.name + '">' +
+                        '<div class="resource-item-info">' +
+                        '<i class="ti ti-file-code resource-item-icon" style="color: var(--accent-cyan);"></i>' +
+                        '<span class="resource-item-name">' + p.name + '</span>' +
+                        '</div>' +
+                        '<i class="ti ti-external-link resource-link-arrow"></i>' +
+                        '</a>';
+                });
+                html += '</div>';
+                bodyEl.innerHTML = html;
+            }
         }
 
         function updateToggleAllState() {
@@ -2857,12 +3178,20 @@ CF_ACCOUNT_NAME_1=main</p>
             cards.forEach(card => {
                 const accountId = card.getAttribute('data-account-id');
                 const metaSec = document.getElementById('meta-section-' + accountId);
+                const resourcesSec = document.getElementById('resources-section-' + accountId);
                 const btn = document.getElementById('collapse-btn-' + accountId);
 
                 if (metaSec && btn) {
                     metaSec.classList.toggle('expanded', targetExpand);
+                    if (resourcesSec) {
+                        resourcesSec.style.display = targetExpand ? 'block' : 'none';
+                    }
                     btn.classList.toggle('expanded', targetExpand);
                     btn.setAttribute('aria-expanded', targetExpand ? 'true' : 'false');
+
+                    if (targetExpand) {
+                        fetchAccountResources(accountId);
+                    }
                 }
             });
 
@@ -3697,6 +4026,96 @@ export default {
       } catch (e) {
         return new Response("Error saving account metadata: " + e.message, { status: 500 });
       }
+    }
+
+    if (url.pathname === "/api/account-resources") {
+      const accountId = url.searchParams.get("account_id");
+      const forceRefresh = url.searchParams.get("refresh") === "1";
+
+      if (!accountId) {
+        return new Response(JSON.stringify({ error: "account_id is required." }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      // Check cache in KV or Memory
+      const kvKey = "RES_" + accountId;
+      if (!forceRefresh && env.CF_USAGE_KV) {
+        try {
+          const cachedJson = await env.CF_USAGE_KV.get(kvKey);
+          if (cachedJson) {
+            return new Response(cachedJson, {
+              headers: { "Content-Type": "application/json", "X-Cache": "KV" }
+            });
+          }
+        } catch (e) {
+          // fallback to live fetch
+        }
+      }
+
+      const accounts = await getAccounts(env);
+      const targetAcc = accounts.find(a => a.account_id === accountId);
+      if (!targetAcc || !targetAcc.api_token) {
+        return new Response(JSON.stringify({ error: "Account not found or missing API token." }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      const headers = {
+        Authorization: `Bearer ${targetAcc.api_token}`,
+        "Content-Type": "application/json"
+      };
+
+      // Fetch workers and pages in parallel with graceful error handling
+      const [workersRes, pagesRes] = await Promise.allSettled([
+        fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts`, { headers }),
+        fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects`, { headers })
+      ]);
+
+      const result = {
+        workers: [],
+        pages: []
+      };
+
+      if (workersRes.status === "fulfilled" && workersRes.value.ok) {
+        try {
+          const wData = await workersRes.value.json();
+          if (wData.success && Array.isArray(wData.result)) {
+            result.workers = wData.result.map(w => ({
+              id: w.id,
+              created_on: w.created_on,
+              modified_on: w.modified_on
+            }));
+          }
+        } catch (e) {}
+      }
+
+      if (pagesRes.status === "fulfilled" && pagesRes.value.ok) {
+        try {
+          const pData = await pagesRes.value.json();
+          if (pData.success && Array.isArray(pData.result)) {
+            result.pages = pData.result.map(p => ({
+              name: p.name,
+              subdomain: p.subdomain,
+              domains: p.canonical_deployment?.aliases || []
+            }));
+          }
+        } catch (e) {}
+      }
+
+      const jsonStr = JSON.stringify(result);
+      if (env.CF_USAGE_KV) {
+        try {
+          // Cache for 2 hours (7200 seconds)
+          await env.CF_USAGE_KV.put(kvKey, jsonStr, { expirationTtl: 7200 });
+        } catch (e) {}
+      }
+
+      return new Response(jsonStr, {
+        headers: { "Content-Type": "application/json", "X-Cache": "MISS" }
+      });
     }
 
     if (url.pathname === "/api/config") {
