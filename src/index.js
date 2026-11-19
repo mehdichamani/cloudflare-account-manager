@@ -91,6 +91,20 @@ async function getAccountMeta(accountId, env) {
   return { note: "", links: [] };
 }
 
+async function getWorkersMeta(accountId, env) {
+  if (env.CF_USAGE_KV) {
+    try {
+      const kvWorkersMeta = await env.CF_USAGE_KV.get("WORKERS_META_" + accountId);
+      if (kvWorkersMeta) {
+        return JSON.parse(kvWorkersMeta);
+      }
+    } catch (e) {
+      console.error("Error reading workers metadata for " + accountId + ":", e);
+    }
+  }
+  return {};
+}
+
 async function getAdminPassword(env) {
   if (env.CF_USAGE_KV) {
     try {
@@ -488,7 +502,7 @@ function renderDashboard(results, env, hasPasswordConfigured) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cloudflare Workers Usage Dashboard</title>
+    <title>Cloudflare Account Manager</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -1439,28 +1453,35 @@ function renderDashboard(results, env, hasPasswordConfigured) {
 
         .resources-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 0.5rem;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 0.65rem;
         }
 
         .resource-item-card {
             background: var(--btn-bg);
             border: 1px solid var(--border-color);
             border-radius: 8px;
-            padding: 0.45rem 0.65rem;
+            padding: 0.55rem 0.75rem;
             display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.5rem;
+            flex-direction: column;
+            gap: 0.4rem;
             transition: all 0.2s ease;
             text-decoration: none;
             color: inherit;
+            position: relative;
         }
 
         .resource-item-card:hover {
             border-color: rgba(243, 128, 32, 0.4);
             background: var(--btn-hover);
             transform: translateY(-1px);
+        }
+
+        .resource-item-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
         }
 
         .resource-item-info {
@@ -1478,12 +1499,95 @@ function renderDashboard(results, env, hasPasswordConfigured) {
         }
 
         .resource-item-name {
-            font-size: 0.78rem;
+            font-size: 0.82rem;
             font-weight: 600;
             color: var(--text-primary);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+        }
+
+        .resource-item-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            flex-shrink: 0;
+        }
+
+        .resource-btn-icon {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .resource-btn-icon:hover {
+            color: var(--cf-orange);
+            background: rgba(243, 128, 32, 0.1);
+        }
+
+        .resource-meta-details {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            padding-top: 0.3rem;
+            border-top: 1px dashed var(--border-color);
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+        }
+
+        .resource-meta-row {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .resource-meta-row i {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+
+        .resource-project-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            background: rgba(6, 182, 212, 0.08);
+            border: 1px solid rgba(6, 182, 212, 0.2);
+            color: var(--accent-cyan);
+            border-radius: 4px;
+            padding: 1px 5px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-decoration: none;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .resource-project-badge:hover {
+            background: rgba(6, 182, 212, 0.18);
+            border-color: var(--accent-cyan);
+        }
+
+        .resource-note-text {
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-style: italic;
         }
 
         .resource-link-arrow {
@@ -2155,8 +2259,8 @@ function renderDashboard(results, env, hasPasswordConfigured) {
                     <i class="ti ti-cloud"></i>
                 </div>
                 <div>
-                    <h1 class="brand-title" data-i18n="brand-title">Cloudflare Workers Usage</h1>
-                    <div class="brand-subtitle" data-i18n="brand-subtitle">Daily Invocation Tracker</div>
+                    <h1 class="brand-title" data-i18n="brand-title">Cloudflare Account Manager</h1>
+                    <div class="brand-subtitle" data-i18n="brand-subtitle">Workers, Pages & Quota Overview</div>
                 </div>
             </div>
             <div class="header-actions">
@@ -2496,6 +2600,50 @@ CF_ACCOUNT_NAME_1=main</p>
         </div>
     </div>
 
+    <!-- Edit Worker Metadata Modal -->
+    <div class="modal" id="edit-worker-meta-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="ti ti-brand-github"></i>
+                    <span data-i18n="worker-meta-modal-title">Worker Project & Notes</span>
+                </div>
+                <button class="close-modal-btn" onclick="closeModal('edit-worker-meta-modal')">
+                    <i class="ti ti-x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-worker-account-id" value="" />
+                <input type="hidden" id="edit-worker-id" value="" />
+                
+                <div style="margin-bottom: 1rem; padding: 0.65rem 0.85rem; background: var(--bg-surface); border-radius: 8px; border: 1px solid var(--border-color);">
+                    <div style="font-size: 0.75rem; color: var(--text-muted);" data-i18n="worker-label">Worker ID</div>
+                    <div style="font-weight: 700; color: var(--cf-orange); font-size: 0.95rem;" id="edit-worker-name-display">--</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="worker-repo-input">
+                        <i class="ti ti-brand-github" style="margin-inline-end: 4px;"></i>
+                        <span data-i18n="worker-repo-label">GitHub Repository / Project URL</span>
+                    </label>
+                    <input type="url" class="form-control" id="worker-repo-input" placeholder="https://github.com/username/project" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="worker-note-input">
+                        <i class="ti ti-notes" style="margin-inline-end: 4px;"></i>
+                        <span data-i18n="worker-note-label">Description / Note</span>
+                    </label>
+                    <textarea class="form-control" id="worker-note-input" rows="3" placeholder="Description of this worker's deployment, purpose, or environment..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal('edit-worker-meta-modal')" data-i18n="btn-cancel">Cancel</button>
+                <button class="btn btn-primary" onclick="saveWorkerMetadata()" data-i18n="btn-save">Save</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Footer -->
     <footer>
         <div class="footer-container">
@@ -2526,8 +2674,8 @@ CF_ACCOUNT_NAME_1=main</p>
         // 1. Translations dictionary
         const translations = {
             "en": {
-                "brand-title": "Cloudflare Workers Usage",
-                "brand-subtitle": "Daily Invocation Tracker",
+                "brand-title": "Cloudflare Account Manager",
+                "brand-subtitle": "Workers, Pages & Quota Overview",
                 "theme-system": "System",
                 "theme-light": "Light",
                 "theme-dark": "Dark",
@@ -2554,6 +2702,13 @@ CF_ACCOUNT_NAME_1=main</p>
                 "resources-no-pages": "No Pages projects found.",
                 "resources-error": "Failed to load resources.",
                 "resources-refresh": "Refresh resources",
+                "label-last-deployed": "Deployed",
+                "edit-worker-meta-btn": "Edit Project & Notes",
+                "worker-meta-modal-title": "Worker Project & Notes",
+                "worker-label": "Worker ID",
+                "worker-repo-label": "GitHub Repository / Project URL",
+                "worker-note-label": "Description / Note",
+                "btn-save": "Save",
                 "usage-invocations": "Invocations Today",
                 "note-label": "Account Notes",
                 "edit-note": "Edit",
@@ -2596,7 +2751,7 @@ CF_ACCOUNT_NAME_1=main</p>
                 "btn-cancel-edit": "Cancel Edit",
                 "btn-save-account": "Save Account",
                 "btn-close": "Close",
-                "footer-rights": "Cloudflare Workers Usage Dashboard. All rights reserved.",
+                "footer-rights": "Cloudflare Account Manager. All rights reserved.",
                 "footer-developed": "Developed with",
                 "footer-by": "by",
                 "footer-powered": "Powered by Cloudflare Workers & Cloudflare KV",
@@ -2624,8 +2779,8 @@ CF_ACCOUNT_NAME_1=main</p>
                 "account-token-help": "Recommended: <a href=\\\"https://dash.cloudflare.com/profile/api-tokens?accountId=%2A&name=cf-usage&permissionGroupKeys=%5B%7B%22key%22%3A%22user_details%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22account_analytics%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22workers_scripts%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22page%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22workers_kv_storage%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22d1%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22zone%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22dns%22%2C%22type%22%3A%22read%22%7D%5D&zoneId=all\\\" target=\\\"_blank\\\" rel=\\\"noopener\\\">Quick One-Click Token Setup</a> or <a href=\\\"https://dash.cloudflare.com/profile/api-tokens\\\" target=\\\"_blank\\\" rel=\\\"noopener\\\">Manual Setup</a>."
             },
             "fa": {
-                "brand-title": "میزان مصرف ورکرز کلودفلر",
-                "brand-subtitle": "پایشگر مصرف روزانه ورکرها",
+                "brand-title": "مدیریت اکانت‌های کلودفلر",
+                "brand-subtitle": "پایش جامع مصرف، ورکرها و پروژه‌ها",
                 "theme-system": "سیستم",
                 "theme-light": "روشن",
                 "theme-dark": "تاریک",
@@ -2652,6 +2807,13 @@ CF_ACCOUNT_NAME_1=main</p>
                 "resources-no-pages": "هیچ پروژه Pages در این اکانت یافت نشد.",
                 "resources-error": "خطا در دریافت لیست منابع.",
                 "resources-refresh": "به‌روزرسانی منابع",
+                "label-last-deployed": "دیپلوی",
+                "edit-worker-meta-btn": "ویرایش پروژه و توضیحات",
+                "worker-meta-modal-title": "پروژه و توضیحات ورکر",
+                "worker-label": "شناسه ورکر",
+                "worker-repo-label": "لینک گیت‌هاب / آدرس پروژه",
+                "worker-note-label": "توضیحات و یادداشت",
+                "btn-save": "ذخیره",
                 "usage-invocations": "درخواست‌های امروز",
                 "note-label": "یادداشت‌های اکانت",
                 "edit-note": "ویرایش",
@@ -2694,7 +2856,7 @@ CF_ACCOUNT_NAME_1=main</p>
                 "btn-cancel-edit": "لغو ویرایش",
                 "btn-save-account": "ذخیره اکانت",
                 "btn-close": "بستن",
-                "footer-rights": "داشبورد پایش مصرف ورکرز کلودفلر. تمامی حقوق محفوظ است.",
+                "footer-rights": "سامانه مدیریت اکانت‌های کلودفلر. تمامی حقوق محفوظ است.",
                 "footer-developed": "توسعه یافته با",
                 "footer-by": "توسط",
                 "footer-powered": "قدرت گرفته از Cloudflare Workers و Cloudflare KV",
@@ -3076,19 +3238,89 @@ CF_ACCOUNT_NAME_1=main</p>
 
             let html = '<div class="resources-grid">';
 
+            // Helper to escape HTML characters
+            const escapeHtml = (str) => {
+                if (!str) return "";
+                return String(str)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            };
+
+            // Helper to format ISO date nicely
+            const formatDateStr = (isoStr) => {
+                if (!isoStr) return "";
+                try {
+                    const d = new Date(isoStr);
+                    return d.toLocaleDateString(currentLang === 'fa' ? 'fa-IR' : 'en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                    });
+                } catch (e) {
+                    return isoStr.split('T')[0];
+                }
+            };
+
             // 1. Render Workers
             workers.forEach(w => {
                 const deployUrl = accountSubdomain
                     ? ('https://' + encodeURIComponent(w.id) + '.' + accountSubdomain + '.workers.dev')
                     : ('https://dash.cloudflare.com/' + accountId + '/workers/services/view/' + encodeURIComponent(w.id));
 
-                html += '<a href="' + deployUrl + '" target="_blank" rel="noopener" class="resource-item-card" title="Worker: ' + w.id + '">' +
-                    '<div class="resource-item-info">' +
-                    '<i class="ti ti-cpu resource-item-icon"></i>' +
-                    '<span class="resource-item-name">' + w.id + '</span>' +
-                    '</div>' +
-                    '<i class="ti ti-arrow-up-right resource-link-arrow"></i>' +
-                    '</a>';
+                const dateStr = formatDateStr(w.modified_on || w.created_on);
+                const hasRepo = Boolean(w.repo_url);
+                const hasNote = Boolean(w.note);
+
+                // Escape values for attributes
+                const safeWorkerId = escapeHtml(w.id);
+                const safeRepoUrl = escapeHtml(w.repo_url || "");
+                const safeNote = escapeHtml(w.note || "");
+
+                html += '<div class="resource-item-card">' +
+                    '<div class="resource-item-header">' +
+                        '<div class="resource-item-info">' +
+                            '<i class="ti ti-cpu resource-item-icon"></i>' +
+                            '<a href="' + deployUrl + '" target="_blank" rel="noopener" class="resource-item-name" title="' + safeWorkerId + '">' + safeWorkerId + '</a>' +
+                        '</div>' +
+                        '<div class="resource-item-actions">' +
+                            '<button class="resource-btn-icon" title="' + translations[currentLang]["edit-worker-meta-btn"] + '" onclick="openEditWorkerMetaModal(\\'' + accountId + '\\', \\'' + safeWorkerId + '\\')">' +
+                                '<i class="ti ti-edit"></i>' +
+                            '</button>' +
+                            '<a href="' + deployUrl + '" target="_blank" rel="noopener" class="resource-link-arrow" title="Open Worker">' +
+                                '<i class="ti ti-arrow-up-right"></i>' +
+                            '</a>' +
+                        '</div>' +
+                    '</div>';
+
+                // Details section (Last deployed date, project url, note)
+                html += '<div class="resource-meta-details">';
+                if (dateStr) {
+                    html += '<div class="resource-meta-row" title="' + translations[currentLang]["label-last-deployed"] + ': ' + dateStr + '">' +
+                        '<i class="ti ti-calendar-time"></i>' +
+                        '<span>' + translations[currentLang]["label-last-deployed"] + ': ' + formatDigits(dateStr, currentLang) + '</span>' +
+                    '</div>';
+                }
+
+                if (hasRepo) {
+                    html += '<div class="resource-meta-row">' +
+                        '<i class="ti ti-brand-github"></i>' +
+                        '<a href="' + safeRepoUrl + '" target="_blank" rel="noopener" class="resource-project-badge" title="' + safeRepoUrl + '">' +
+                            safeRepoUrl.replace(/^https?:\\/\\/(www\\.)?github\\.com\\//i, '') +
+                        '</a>' +
+                    '</div>';
+                }
+
+                if (hasNote) {
+                    html += '<div class="resource-meta-row resource-note-text" title="' + safeNote + '">' +
+                        '<i class="ti ti-notes"></i>' +
+                        '<span>' + safeNote + '</span>' +
+                    '</div>';
+                }
+
+                html += '</div></div>';
             });
 
             // 2. Render Pages
@@ -3097,13 +3329,47 @@ CF_ACCOUNT_NAME_1=main</p>
                     ? ('https://' + p.subdomain)
                     : ('https://dash.cloudflare.com/' + accountId + '/pages/view/' + encodeURIComponent(p.name));
 
-                html += '<a href="' + pageUrl + '" target="_blank" rel="noopener" class="resource-item-card" title="Pages: ' + p.name + '">' +
-                    '<div class="resource-item-info">' +
-                    '<i class="ti ti-file-code resource-item-icon" style="color: var(--accent-cyan);"></i>' +
-                    '<span class="resource-item-name">' + p.name + '</span>' +
-                    '</div>' +
-                    '<i class="ti ti-arrow-up-right resource-link-arrow"></i>' +
-                    '</a>';
+                const dateStr = formatDateStr(p.modified_on || p.created_on);
+                const domains = p.domains || [];
+                const safePageName = escapeHtml(p.name);
+
+                html += '<div class="resource-item-card">' +
+                    '<div class="resource-item-header">' +
+                        '<div class="resource-item-info">' +
+                            '<i class="ti ti-file-code resource-item-icon" style="color: var(--accent-cyan);"></i>' +
+                            '<a href="' + pageUrl + '" target="_blank" rel="noopener" class="resource-item-name" title="' + safePageName + '">' + safePageName + '</a>' +
+                        '</div>' +
+                        '<div class="resource-item-actions">' +
+                            '<a href="' + pageUrl + '" target="_blank" rel="noopener" class="resource-link-arrow" title="Open Pages">' +
+                                '<i class="ti ti-arrow-up-right"></i>' +
+                            '</a>' +
+                        '</div>' +
+                    '</div>';
+
+                html += '<div class="resource-meta-details">';
+                if (dateStr) {
+                    html += '<div class="resource-meta-row" title="' + translations[currentLang]["label-last-deployed"] + ': ' + dateStr + '">' +
+                        '<i class="ti ti-calendar-time"></i>' +
+                        '<span>' + translations[currentLang]["label-last-deployed"] + ': ' + formatDigits(dateStr, currentLang) + '</span>' +
+                    '</div>';
+                }
+
+                if (domains.length > 0) {
+                    const domainDisplay = domains[0];
+                    html += '<div class="resource-meta-row" title="' + domains.join(', ') + '">' +
+                        '<i class="ti ti-world"></i>' +
+                        '<a href="https://' + domainDisplay + '" target="_blank" rel="noopener" class="resource-project-badge" style="color: var(--text-primary); border-color: var(--border-color);">' +
+                            domainDisplay + (domains.length > 1 ? (' +' + (domains.length - 1)) : '') +
+                        '</a>' +
+                    '</div>';
+                } else if (p.subdomain) {
+                    html += '<div class="resource-meta-row">' +
+                        '<i class="ti ti-world"></i>' +
+                        '<span style="font-size: 0.7rem; color: var(--text-muted);">' + p.subdomain + '</span>' +
+                    '</div>';
+                }
+
+                html += '</div></div>';
             });
 
             html += '</div>';
@@ -3495,6 +3761,67 @@ CF_ACCOUNT_NAME_1=main</p>
             }
         }
 
+        // Worker Metadata Modal functions
+        function openEditWorkerMetaModal(accountId, workerId) {
+            if (!requireUnlock()) return;
+
+            document.getElementById('edit-worker-account-id').value = accountId;
+            document.getElementById('edit-worker-id').value = workerId;
+            document.getElementById('edit-worker-name-display').textContent = workerId;
+
+            // Pre-fill existing metadata if available
+            const cachedRes = cachedAccountResources.get(accountId);
+            const targetWorker = (cachedRes?.workers || []).find(w => w.id === workerId);
+
+            document.getElementById('worker-repo-input').value = targetWorker?.repo_url || '';
+            document.getElementById('worker-note-input').value = targetWorker?.note || '';
+
+            openModal('edit-worker-meta-modal');
+        }
+
+        async function saveWorkerMetadata() {
+            const accountId = document.getElementById('edit-worker-account-id').value;
+            const workerId = document.getElementById('edit-worker-id').value;
+            const repoUrl = document.getElementById('worker-repo-input').value.trim();
+            const note = document.getElementById('worker-note-input').value.trim();
+
+            if (!accountId || !workerId) return;
+
+            try {
+                const res = await fetch('/api/worker-meta', {
+                    method: 'POST',
+                    headers: getAuthHeader(),
+                    body: JSON.stringify({
+                        account_id: accountId,
+                        worker_id: workerId,
+                        repo_url: repoUrl,
+                        note: note
+                    })
+                });
+
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({ error: 'Request failed' }));
+                    alert('Error saving worker metadata: ' + (err.error || res.statusText));
+                    return;
+                }
+
+                // Update client cache
+                const cached = cachedAccountResources.get(accountId);
+                if (cached && Array.isArray(cached.workers)) {
+                    const w = cached.workers.find(item => item.id === workerId);
+                    if (w) {
+                        w.repo_url = repoUrl;
+                        w.note = note;
+                    }
+                }
+
+                closeModal('edit-worker-meta-modal');
+                renderAccountResources(accountId);
+            } catch (e) {
+                alert('Connection error: ' + e.message);
+            }
+        }
+
         // Manage Accounts Modal UI list builder
         function openManageAccountsModal() {
             if (!requireUnlock()) return;
@@ -3769,7 +4096,7 @@ CF_ACCOUNT_NAME_1=main</p>
                     return;
                 }
 
-                let envContent = "# Cloudflare Workers Usage Dashboard Exported Env\\n";
+                let envContent = "# Cloudflare Account Manager Exported Env\\n";
                 accounts.forEach((acc, index) => {
                     const i = index + 1;
                     envContent += '\\n# Account ' + i + ': ' + acc.name + '\\n';
@@ -3801,7 +4128,7 @@ async function purgeEdgeCache(request) {
     const cache = typeof caches !== "undefined" ? caches.default : null;
     if (cache) {
       const cacheUrl = new URL(request.url);
-      cacheUrl.pathname = "/__cached_dashboard";
+      cacheUrl.pathname = "/__cached_dashboard_v2";
       const cacheKey = new Request(cacheUrl.toString(), { method: "GET" });
       await cache.delete(cacheKey);
     }
@@ -4042,10 +4369,11 @@ async function handleRequest(request, env, ctx) {
       };
 
       // Fetch workers, pages, and account subdomain in parallel with graceful error handling
-      const [workersRes, pagesRes, subdomainRes] = await Promise.allSettled([
+      const [workersRes, pagesRes, subdomainRes, workersMeta] = await Promise.allSettled([
         fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts`, { headers }),
         fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects`, { headers }),
-        fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/subdomain`, { headers })
+        fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/subdomain`, { headers }),
+        getWorkersMeta(accountId, env)
       ]);
 
       let accountSubdomain = "";
@@ -4058,6 +4386,8 @@ async function handleRequest(request, env, ctx) {
         } catch (e) {}
       }
 
+      const metaMap = (workersMeta.status === "fulfilled" && workersMeta.value) ? workersMeta.value : {};
+
       const result = {
         subdomain: accountSubdomain,
         workers: [],
@@ -4068,11 +4398,16 @@ async function handleRequest(request, env, ctx) {
         try {
           const wData = await workersRes.value.json();
           if (wData.success && Array.isArray(wData.result)) {
-            result.workers = wData.result.map(w => ({
-              id: w.id,
-              created_on: w.created_on,
-              modified_on: w.modified_on
-            }));
+            result.workers = wData.result.map(w => {
+              const customMeta = metaMap[w.id] || {};
+              return {
+                id: w.id,
+                created_on: w.created_on,
+                modified_on: w.modified_on,
+                repo_url: customMeta.repo_url || "",
+                note: customMeta.note || ""
+              };
+            });
           }
         } catch (e) {}
       }
@@ -4081,11 +4416,25 @@ async function handleRequest(request, env, ctx) {
         try {
           const pData = await pagesRes.value.json();
           if (pData.success && Array.isArray(pData.result)) {
-            result.pages = pData.result.map(p => ({
-              name: p.name,
-              subdomain: p.subdomain,
-              domains: p.canonical_deployment?.aliases || []
-            }));
+            result.pages = pData.result.map(p => {
+              // Extract last deployed date from latest_deployment or canonical_deployment
+              const lastDeployed = p.latest_deployment?.created_on || p.canonical_deployment?.created_on || p.created_on || null;
+              // Extract custom domains / aliases
+              const aliases = [];
+              if (Array.isArray(p.canonical_deployment?.aliases)) {
+                aliases.push(...p.canonical_deployment.aliases);
+              }
+              if (Array.isArray(p.domains)) {
+                p.domains.forEach(d => { if (!aliases.includes(d)) aliases.push(d); });
+              }
+              return {
+                name: p.name,
+                subdomain: p.subdomain,
+                created_on: p.created_on,
+                modified_on: lastDeployed,
+                domains: aliases
+              };
+            });
           }
         } catch (e) {}
       }
@@ -4101,6 +4450,202 @@ async function handleRequest(request, env, ctx) {
       return new Response(jsonStr, {
         headers: { "Content-Type": "application/json", "X-Cache": "MISS" }
       });
+    }
+
+    if (url.pathname === "/api/worker-meta") {
+      if (request.method !== "POST") {
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+      if (!await verifyPassword(request, env)) {
+        return new Response(JSON.stringify({ success: false, error: "Unauthorized or admin password not configured." }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      try {
+        const body = await request.json();
+        const { account_id, worker_id, repo_url, note } = body;
+        if (!account_id || !worker_id) {
+          return new Response(JSON.stringify({ success: false, error: "account_id and worker_id are required." }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        if (!env.CF_USAGE_KV) {
+          return new Response(JSON.stringify({ success: false, error: "KV namespace (CF_USAGE_KV) is not bound." }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        const currentMeta = await getWorkersMeta(account_id, env);
+        currentMeta[worker_id] = {
+          repo_url: formatExternalUrl(repo_url || ""),
+          note: (note || "").trim()
+        };
+
+        await env.CF_USAGE_KV.put("WORKERS_META_" + account_id, JSON.stringify(currentMeta));
+
+        // Invalidate resources cache for this account so new meta appears immediately
+        try {
+          await env.CF_USAGE_KV.delete("RES_" + account_id);
+        } catch (e) {}
+
+        return new Response(JSON.stringify({ success: true, meta: currentMeta[worker_id] }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ success: false, error: "Error saving worker meta: " + e.message }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
+    // --- CLI & API Endpoints for Automation & Queries ---
+    if (url.pathname === "/api/v1/accounts" || url.pathname === "/api/accounts-summary") {
+      try {
+        const accounts = await getAccounts(env);
+        const list = [];
+        for (const acc of accounts) {
+          const cached = MEMORY_CACHE.get(acc.account_id);
+          const meta = await getAccountMeta(acc.account_id, env);
+          list.push({
+            account_id: acc.account_id,
+            name: cached?.data?.name || acc.name,
+            email: cached?.data?.email || null,
+            requests: cached?.data?.requests ?? null,
+            limit: cached?.data?.limit ?? WORKERS_LIMIT,
+            pct: cached?.data?.pct ?? null,
+            error: cached?.data?.error ?? null,
+            meta
+          });
+        }
+        return new Response(JSON.stringify({ success: true, count: list.length, accounts: list }, null, 2), {
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ success: false, error: e.message }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
+    if (url.pathname === "/api/v1/resources") {
+      const targetAccountId = url.searchParams.get("account_id");
+      try {
+        const accounts = await getAccounts(env);
+        const filteredAccounts = targetAccountId ? accounts.filter(a => a.account_id === targetAccountId) : accounts;
+        
+        const output = [];
+        for (const acc of filteredAccounts) {
+          let resData = null;
+          if (env.CF_USAGE_KV) {
+            try {
+              const cachedJson = await env.CF_USAGE_KV.get("RES_" + acc.account_id);
+              if (cachedJson) resData = JSON.parse(cachedJson);
+            } catch (e) {}
+          }
+          output.push({
+            account_id: acc.account_id,
+            account_name: acc.name,
+            subdomain: resData?.subdomain || "",
+            workers: resData?.workers || [],
+            pages: resData?.pages || []
+          });
+        }
+        return new Response(JSON.stringify({ success: true, count: output.length, accounts: output }, null, 2), {
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ success: false, error: e.message }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
+    if (url.pathname === "/api/v1/lookup") {
+      const projectQuery = (url.searchParams.get("project") || url.searchParams.get("repo") || url.searchParams.get("q") || "").toLowerCase().trim();
+      if (!projectQuery) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: "Query parameter 'project' (or 'repo' or 'q') is required. Example: /api/v1/lookup?project=my-repo"
+        }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      try {
+        const accounts = await getAccounts(env);
+        const matches = [];
+
+        for (const acc of accounts) {
+          let resData = null;
+          if (env.CF_USAGE_KV) {
+            try {
+              const cachedJson = await env.CF_USAGE_KV.get("RES_" + acc.account_id);
+              if (cachedJson) resData = JSON.parse(cachedJson);
+            } catch (e) {}
+          }
+
+          const workers = resData?.workers || [];
+          for (const w of workers) {
+            const repo = (w.repo_url || "").toLowerCase();
+            const note = (w.note || "").toLowerCase();
+            const id = (w.id || "").toLowerCase();
+
+            if (repo.includes(projectQuery) || note.includes(projectQuery) || id.includes(projectQuery)) {
+              matches.push({
+                type: "worker",
+                account_id: acc.account_id,
+                account_name: acc.name,
+                worker_id: w.id,
+                repo_url: w.repo_url || "",
+                note: w.note || "",
+                modified_on: w.modified_on,
+                subdomain_url: resData?.subdomain ? `https://${w.id}.${resData.subdomain}.workers.dev` : ""
+              });
+            }
+          }
+
+          const pages = resData?.pages || [];
+          for (const p of pages) {
+            const name = (p.name || "").toLowerCase();
+            const domains = (p.domains || []).join(" ").toLowerCase();
+
+            if (name.includes(projectQuery) || domains.includes(projectQuery)) {
+              matches.push({
+                type: "pages",
+                account_id: acc.account_id,
+                account_name: acc.name,
+                pages_name: p.name,
+                domains: p.domains,
+                subdomain: p.subdomain,
+                modified_on: p.modified_on
+              });
+            }
+          }
+        }
+
+        return new Response(JSON.stringify({
+          success: true,
+          query: projectQuery,
+          match_count: matches.length,
+          matches
+        }, null, 2), {
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ success: false, error: e.message }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
     }
 
     if (url.pathname === "/api/config") {
@@ -4135,7 +4680,7 @@ async function handleRequest(request, env, ctx) {
     const isLocalDev = url.hostname === "localhost" || url.hostname === "127.0.0.1";
     const cache = (typeof caches !== "undefined" && !isLocalDev) ? caches.default : null;
     const cacheUrl = new URL(request.url);
-    cacheUrl.pathname = "/__cached_dashboard";
+    cacheUrl.pathname = "/__cached_dashboard_v2";
     const cacheKey = new Request(cacheUrl.toString(), { method: "GET" });
 
     if (cache && env.MOCK_CF !== "true" && request.method === "GET" && !request.headers.get("Authorization")) {

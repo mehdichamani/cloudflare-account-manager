@@ -1,4 +1,4 @@
-name = "cf-usage"
+name = "cloudflare-account-manager"
 main = "src/index.js"
 compatibility_date = "2025-02-04"
 
