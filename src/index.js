@@ -3288,36 +3288,34 @@ CF_ACCOUNT_NAME_1=main</p>
 
             // 1. Render Workers
             workers.forEach(w => {
-                const deployUrl = accountSubdomain
-                    ? ('https://' + encodeURIComponent(w.id) + '.' + accountSubdomain + '.workers.dev')
-                    : ('https://dash.cloudflare.com/' + accountId + '/workers/services/view/' + encodeURIComponent(w.id));
-
                 const dateStr = formatDateStr(w.modified_on || w.created_on);
                 const hasRepo = Boolean(w.repo_url);
                 const hasNote = Boolean(w.note);
+                const domains = w.domains || [];
 
                 // Escape values for attributes
                 const safeWorkerId = escapeHtml(w.id);
                 const safeRepoUrl = escapeHtml(w.repo_url || "");
                 const safeNote = escapeHtml(w.note || "");
+                const cfDashUrl = 'https://dash.cloudflare.com/' + accountId + '/workers/services/view/' + encodeURIComponent(w.id);
 
                 html += '<div class="resource-item-card">' +
                     '<div class="resource-item-header">' +
                         '<div class="resource-item-info">' +
                             '<i class="ti ti-cpu resource-item-icon"></i>' +
-                            '<a href="' + deployUrl + '" target="_blank" rel="noopener" class="resource-item-name" title="' + safeWorkerId + '">' + safeWorkerId + '</a>' +
+                            '<span class="resource-item-name" title="' + safeWorkerId + '">' + safeWorkerId + '</span>' +
                         '</div>' +
                         '<div class="resource-item-actions">' +
                             '<button class="resource-btn-icon" title="' + translations[currentLang]["edit-worker-meta-btn"] + '" onclick="openEditResourceMetaModal(\\'' + accountId + '\\', \\'' + safeWorkerId + '\\', \\'worker\\')">' +
                                 '<i class="ti ti-edit"></i>' +
                             '</button>' +
-                            '<a href="' + deployUrl + '" target="_blank" rel="noopener" class="resource-link-arrow" title="Open Worker">' +
+                            '<a href="' + cfDashUrl + '" target="_blank" rel="noopener" class="resource-link-arrow" title="Open Cloudflare Dashboard">' +
                                 '<i class="ti ti-arrow-up-right"></i>' +
                             '</a>' +
                         '</div>' +
                     '</div>';
 
-                // Details section (Last deployed date, project url, note)
+                // Details section (Last deployed date, project url, domains, note)
                 html += '<div class="resource-meta-details">';
                 if (dateStr) {
                     html += '<div class="resource-meta-row" title="' + translations[currentLang]["label-last-deployed"] + ': ' + dateStr + '">' +
@@ -3335,6 +3333,19 @@ CF_ACCOUNT_NAME_1=main</p>
                     '</div>';
                 }
 
+                if (domains.length > 0) {
+                    domains.forEach(domain => {
+                        const safeDomain = escapeHtml(domain);
+                        const href = safeDomain.startsWith('http') ? safeDomain : ('https://' + safeDomain);
+                        html += '<div class="resource-meta-row" title="' + safeDomain + '">' +
+                            '<i class="ti ti-world"></i>' +
+                            '<a href="' + href + '" target="_blank" rel="noopener" class="resource-project-badge" style="color: var(--text-primary); border-color: var(--border-color);">' +
+                                safeDomain +
+                            '</a>' +
+                        '</div>';
+                    });
+                }
+
                 if (hasNote) {
                     html += '<div class="resource-meta-row resource-note-text" title="' + safeNote + '">' +
                         '<i class="ti ti-notes"></i>' +
@@ -3347,10 +3358,6 @@ CF_ACCOUNT_NAME_1=main</p>
 
             // 2. Render Pages
             pages.forEach(p => {
-                const pageUrl = p.subdomain
-                    ? ('https://' + p.subdomain)
-                    : ('https://dash.cloudflare.com/' + accountId + '/pages/view/' + encodeURIComponent(p.name));
-
                 const dateStr = formatDateStr(p.modified_on || p.created_on);
                 const domains = p.domains || [];
                 const safePageName = escapeHtml(p.name);
@@ -3358,18 +3365,19 @@ CF_ACCOUNT_NAME_1=main</p>
                 const safeNote = escapeHtml(p.note || "");
                 const hasRepo = Boolean(p.repo_url);
                 const hasNote = Boolean(p.note);
+                const cfDashUrl = 'https://dash.cloudflare.com/' + accountId + '/pages/view/' + encodeURIComponent(p.name);
 
                 html += '<div class="resource-item-card">' +
                     '<div class="resource-item-header">' +
                         '<div class="resource-item-info">' +
                             '<i class="ti ti-file-code resource-item-icon" style="color: var(--accent-cyan);"></i>' +
-                            '<a href="' + pageUrl + '" target="_blank" rel="noopener" class="resource-item-name" title="' + safePageName + '">' + safePageName + '</a>' +
+                            '<span class="resource-item-name" title="' + safePageName + '">' + safePageName + '</span>' +
                         '</div>' +
                         '<div class="resource-item-actions">' +
                             '<button class="resource-btn-icon" title="' + translations[currentLang]["edit-worker-meta-btn"] + '" onclick="openEditResourceMetaModal(\\'' + accountId + '\\', \\'' + safePageName + '\\', \\'pages\\')">' +
                                 '<i class="ti ti-edit"></i>' +
                             '</button>' +
-                            '<a href="' + pageUrl + '" target="_blank" rel="noopener" class="resource-link-arrow" title="Open Pages">' +
+                            '<a href="' + cfDashUrl + '" target="_blank" rel="noopener" class="resource-link-arrow" title="Open Cloudflare Dashboard">' +
                                 '<i class="ti ti-arrow-up-right"></i>' +
                             '</a>' +
                         '</div>' +
@@ -3395,18 +3403,21 @@ CF_ACCOUNT_NAME_1=main</p>
                 if (domains.length > 0) {
                     domains.forEach(domain => {
                         const safeDomain = escapeHtml(domain);
+                        const href = safeDomain.startsWith('http') ? safeDomain : ('https://' + safeDomain);
                         html += '<div class="resource-meta-row" title="' + safeDomain + '">' +
                             '<i class="ti ti-world"></i>' +
-                            '<a href="https://' + safeDomain + '" target="_blank" rel="noopener" class="resource-project-badge" style="color: var(--text-primary); border-color: var(--border-color);">' +
+                            '<a href="' + href + '" target="_blank" rel="noopener" class="resource-project-badge" style="color: var(--text-primary); border-color: var(--border-color);">' +
                                 safeDomain +
                             '</a>' +
                         '</div>';
                     });
                 } else if (p.subdomain) {
+                    const safeSub = escapeHtml(p.subdomain);
+                    const href = safeSub.startsWith('http') ? safeSub : ('https://' + safeSub);
                     html += '<div class="resource-meta-row">' +
                         '<i class="ti ti-world"></i>' +
-                        '<a href="https://' + escapeHtml(p.subdomain) + '" target="_blank" rel="noopener" class="resource-project-badge" style="color: var(--text-primary); border-color: var(--border-color);">' +
-                            escapeHtml(p.subdomain) +
+                        '<a href="' + href + '" target="_blank" rel="noopener" class="resource-project-badge" style="color: var(--text-primary); border-color: var(--border-color);">' +
+                            safeSub +
                         '</a>' +
                     '</div>';
                 }
@@ -4459,11 +4470,12 @@ async function handleRequest(request, env, ctx) {
         "Content-Type": "application/json"
       };
 
-      // Fetch workers, pages, account subdomain, and custom metadata in parallel with graceful error handling
-      const [workersRes, pagesRes, subdomainRes, workersMeta, pagesMeta] = await Promise.allSettled([
+      // Fetch workers, pages, account subdomain, custom domains, and custom metadata in parallel with graceful error handling
+      const [workersRes, pagesRes, subdomainRes, workerDomainsRes, workersMeta, pagesMeta] = await Promise.allSettled([
         fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts`, { headers }),
         fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects`, { headers }),
         fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/subdomain`, { headers }),
+        fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/domains`, { headers }),
         getWorkersMeta(accountId, env),
         getPagesMeta(accountId, env)
       ]);
@@ -4474,6 +4486,25 @@ async function handleRequest(request, env, ctx) {
           const sData = await subdomainRes.value.json();
           if (sData.success && sData.result?.subdomain) {
             accountSubdomain = sData.result.subdomain;
+          }
+        } catch (e) {}
+      }
+
+      // Map worker custom domains from /accounts/{accountId}/workers/domains
+      const workerDomainsMap = {};
+      if (workerDomainsRes.status === "fulfilled" && workerDomainsRes.value.ok) {
+        try {
+          const dData = await workerDomainsRes.value.json();
+          if (dData.success && Array.isArray(dData.result)) {
+            dData.result.forEach(d => {
+              const svc = d.service;
+              if (svc && d.hostname) {
+                if (!workerDomainsMap[svc]) workerDomainsMap[svc] = [];
+                if (!workerDomainsMap[svc].includes(d.hostname)) {
+                  workerDomainsMap[svc].push(d.hostname);
+                }
+              }
+            });
           }
         } catch (e) {}
       }
@@ -4493,10 +4524,20 @@ async function handleRequest(request, env, ctx) {
           if (wData.success && Array.isArray(wData.result)) {
             result.workers = wData.result.map(w => {
               const customMeta = metaMap[w.id] || {};
+              const domains = [];
+              if (accountSubdomain) {
+                domains.push(`${w.id}.${accountSubdomain}.workers.dev`);
+              }
+              const customDomains = workerDomainsMap[w.id] || [];
+              customDomains.forEach(cd => {
+                if (!domains.includes(cd)) domains.push(cd);
+              });
+
               return {
                 id: w.id,
                 created_on: w.created_on,
                 modified_on: w.modified_on,
+                domains: domains,
                 repo_url: customMeta.repo_url || "",
                 note: customMeta.note || ""
               };
@@ -4746,8 +4787,9 @@ async function handleRequest(request, env, ctx) {
             const repo = (w.repo_url || "").toLowerCase();
             const note = (w.note || "").toLowerCase();
             const id = (w.id || "").toLowerCase();
+            const domains = (w.domains || []).join(" ").toLowerCase();
 
-            if (repo.includes(projectQuery) || note.includes(projectQuery) || id.includes(projectQuery)) {
+            if (repo.includes(projectQuery) || note.includes(projectQuery) || id.includes(projectQuery) || domains.includes(projectQuery)) {
               matches.push({
                 type: "worker",
                 account_id: acc.account_id,
@@ -4755,6 +4797,7 @@ async function handleRequest(request, env, ctx) {
                 worker_id: w.id,
                 repo_url: w.repo_url || "",
                 note: w.note || "",
+                domains: w.domains || [],
                 modified_on: w.modified_on,
                 subdomain_url: resData?.subdomain ? `https://${w.id}.${resData.subdomain}.workers.dev` : ""
               });
