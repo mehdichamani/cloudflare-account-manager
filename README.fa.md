@@ -47,6 +47,7 @@ export CF_MANAGER_URL="https://your-manager.workers.dev"
 - `GET /api/v1/resources?account_id=...`: دریافت ورکرها و پیج‌ها همراه با متادیتا و تاریخ دیپلوی.
 - `GET /api/v1/lookup?project=...`: جستجوی معکوس بر اساس نام پروژه یا لینک گیت‌هاب.
 - `POST /api/worker-meta`: ذخیره یا تغییر لینک گیت‌هاب و یادداشت ورکر (نیازمند توکن ادمین).
+- `POST /api/pages-meta`: ذخیره یا تغییر لینک گیت‌هاب و یادداشت پروژه Pages (نیازمند توکن ادمین).
 
 ---
 

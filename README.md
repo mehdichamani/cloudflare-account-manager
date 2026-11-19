@@ -44,6 +44,7 @@ export CF_MANAGER_URL="https://your-manager.workers.dev"
 - `GET /api/v1/resources?account_id=...`: Get detailed workers and pages with metadata.
 - `GET /api/v1/lookup?project=...`: Reverse search workers and pages matching a project name or GitHub URL.
 - `POST /api/worker-meta`: Update worker repository link and notes (Bearer token protected).
+- `POST /api/pages-meta`: Update Pages project repository link and notes (Bearer token protected).
 
 ---
 

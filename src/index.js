@@ -105,6 +105,20 @@ async function getWorkersMeta(accountId, env) {
   return {};
 }
 
+async function getPagesMeta(accountId, env) {
+  if (env.CF_USAGE_KV) {
+    try {
+      const kvPagesMeta = await env.CF_USAGE_KV.get("PAGES_META_" + accountId);
+      if (kvPagesMeta) {
+        return JSON.parse(kvPagesMeta);
+      }
+    } catch (e) {
+      console.error("Error reading pages metadata for " + accountId + ":", e);
+    }
+  }
+  return {};
+}
+
 async function getAdminPassword(env) {
   if (env.CF_USAGE_KV) {
     try {
@@ -1584,10 +1598,13 @@ function renderDashboard(results, env, hasPasswordConfigured) {
         .resource-note-text {
             color: var(--text-secondary);
             font-size: 0.7rem;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            max-height: 120px;
+            overflow-y: auto;
             font-style: italic;
+            line-height: 1.4;
         }
 
         .resource-link-arrow {
@@ -2600,13 +2617,13 @@ CF_ACCOUNT_NAME_1=main</p>
         </div>
     </div>
 
-    <!-- Edit Worker Metadata Modal -->
+    <!-- Edit Worker / Page Metadata Modal -->
     <div class="modal" id="edit-worker-meta-modal">
         <div class="modal-content">
             <div class="modal-header">
                 <div class="modal-title">
                     <i class="ti ti-brand-github"></i>
-                    <span data-i18n="worker-meta-modal-title">Worker Project & Notes</span>
+                    <span id="resource-modal-title-text" data-i18n="worker-meta-modal-title">Worker Project & Notes</span>
                 </div>
                 <button class="close-modal-btn" onclick="closeModal('edit-worker-meta-modal')">
                     <i class="ti ti-x"></i>
@@ -2615,9 +2632,10 @@ CF_ACCOUNT_NAME_1=main</p>
             <div class="modal-body">
                 <input type="hidden" id="edit-worker-account-id" value="" />
                 <input type="hidden" id="edit-worker-id" value="" />
+                <input type="hidden" id="edit-resource-type" value="worker" />
                 
                 <div style="margin-bottom: 1rem; padding: 0.65rem 0.85rem; background: var(--bg-surface); border-radius: 8px; border: 1px solid var(--border-color);">
-                    <div style="font-size: 0.75rem; color: var(--text-muted);" data-i18n="worker-label">Worker ID</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);" id="edit-resource-label-display" data-i18n="worker-label">Worker ID</div>
                     <div style="font-weight: 700; color: var(--cf-orange); font-size: 0.95rem;" id="edit-worker-name-display">--</div>
                 </div>
 
@@ -2634,7 +2652,7 @@ CF_ACCOUNT_NAME_1=main</p>
                         <i class="ti ti-notes" style="margin-inline-end: 4px;"></i>
                         <span data-i18n="worker-note-label">Description / Note</span>
                     </label>
-                    <textarea class="form-control" id="worker-note-input" rows="3" placeholder="Description of this worker's deployment, purpose, or environment..."></textarea>
+                    <textarea class="form-control" id="worker-note-input" rows="4" placeholder="Description of deployment, purpose, environment, or multiline notes..."></textarea>
                 </div>
             </div>
             <div class="modal-footer">
@@ -2705,7 +2723,9 @@ CF_ACCOUNT_NAME_1=main</p>
                 "label-last-deployed": "Deployed",
                 "edit-worker-meta-btn": "Edit Project & Notes",
                 "worker-meta-modal-title": "Worker Project & Notes",
+                "page-meta-modal-title": "Pages Project & Notes",
                 "worker-label": "Worker ID",
+                "page-label": "Pages Project",
                 "worker-repo-label": "GitHub Repository / Project URL",
                 "worker-note-label": "Description / Note",
                 "btn-save": "Save",
@@ -2810,7 +2830,9 @@ CF_ACCOUNT_NAME_1=main</p>
                 "label-last-deployed": "دیپلوی",
                 "edit-worker-meta-btn": "ویرایش پروژه و توضیحات",
                 "worker-meta-modal-title": "پروژه و توضیحات ورکر",
+                "page-meta-modal-title": "پروژه و توضیحات Pages",
                 "worker-label": "شناسه ورکر",
+                "page-label": "پروژه Pages",
                 "worker-repo-label": "لینک گیت‌هاب / آدرس پروژه",
                 "worker-note-label": "توضیحات و یادداشت",
                 "btn-save": "ذخیره",
@@ -3286,7 +3308,7 @@ CF_ACCOUNT_NAME_1=main</p>
                             '<a href="' + deployUrl + '" target="_blank" rel="noopener" class="resource-item-name" title="' + safeWorkerId + '">' + safeWorkerId + '</a>' +
                         '</div>' +
                         '<div class="resource-item-actions">' +
-                            '<button class="resource-btn-icon" title="' + translations[currentLang]["edit-worker-meta-btn"] + '" onclick="openEditWorkerMetaModal(\\'' + accountId + '\\', \\'' + safeWorkerId + '\\')">' +
+                            '<button class="resource-btn-icon" title="' + translations[currentLang]["edit-worker-meta-btn"] + '" onclick="openEditResourceMetaModal(\\'' + accountId + '\\', \\'' + safeWorkerId + '\\', \\'worker\\')">' +
                                 '<i class="ti ti-edit"></i>' +
                             '</button>' +
                             '<a href="' + deployUrl + '" target="_blank" rel="noopener" class="resource-link-arrow" title="Open Worker">' +
@@ -3332,6 +3354,10 @@ CF_ACCOUNT_NAME_1=main</p>
                 const dateStr = formatDateStr(p.modified_on || p.created_on);
                 const domains = p.domains || [];
                 const safePageName = escapeHtml(p.name);
+                const safeRepoUrl = escapeHtml(p.repo_url || "");
+                const safeNote = escapeHtml(p.note || "");
+                const hasRepo = Boolean(p.repo_url);
+                const hasNote = Boolean(p.note);
 
                 html += '<div class="resource-item-card">' +
                     '<div class="resource-item-header">' +
@@ -3340,6 +3366,9 @@ CF_ACCOUNT_NAME_1=main</p>
                             '<a href="' + pageUrl + '" target="_blank" rel="noopener" class="resource-item-name" title="' + safePageName + '">' + safePageName + '</a>' +
                         '</div>' +
                         '<div class="resource-item-actions">' +
+                            '<button class="resource-btn-icon" title="' + translations[currentLang]["edit-worker-meta-btn"] + '" onclick="openEditResourceMetaModal(\\'' + accountId + '\\', \\'' + safePageName + '\\', \\'pages\\')">' +
+                                '<i class="ti ti-edit"></i>' +
+                            '</button>' +
                             '<a href="' + pageUrl + '" target="_blank" rel="noopener" class="resource-link-arrow" title="Open Pages">' +
                                 '<i class="ti ti-arrow-up-right"></i>' +
                             '</a>' +
@@ -3354,18 +3383,38 @@ CF_ACCOUNT_NAME_1=main</p>
                     '</div>';
                 }
 
-                if (domains.length > 0) {
-                    const domainDisplay = domains[0];
-                    html += '<div class="resource-meta-row" title="' + domains.join(', ') + '">' +
-                        '<i class="ti ti-world"></i>' +
-                        '<a href="https://' + domainDisplay + '" target="_blank" rel="noopener" class="resource-project-badge" style="color: var(--text-primary); border-color: var(--border-color);">' +
-                            domainDisplay + (domains.length > 1 ? (' +' + (domains.length - 1)) : '') +
+                if (hasRepo) {
+                    html += '<div class="resource-meta-row">' +
+                        '<i class="ti ti-brand-github"></i>' +
+                        '<a href="' + safeRepoUrl + '" target="_blank" rel="noopener" class="resource-project-badge" title="' + safeRepoUrl + '">' +
+                            safeRepoUrl.replace(/^https?:\\/\\/(www\\.)?github\\.com\\//i, '') +
                         '</a>' +
                     '</div>';
+                }
+
+                if (domains.length > 0) {
+                    domains.forEach(domain => {
+                        const safeDomain = escapeHtml(domain);
+                        html += '<div class="resource-meta-row" title="' + safeDomain + '">' +
+                            '<i class="ti ti-world"></i>' +
+                            '<a href="https://' + safeDomain + '" target="_blank" rel="noopener" class="resource-project-badge" style="color: var(--text-primary); border-color: var(--border-color);">' +
+                                safeDomain +
+                            '</a>' +
+                        '</div>';
+                    });
                 } else if (p.subdomain) {
                     html += '<div class="resource-meta-row">' +
                         '<i class="ti ti-world"></i>' +
-                        '<span style="font-size: 0.7rem; color: var(--text-muted);">' + p.subdomain + '</span>' +
+                        '<a href="https://' + escapeHtml(p.subdomain) + '" target="_blank" rel="noopener" class="resource-project-badge" style="color: var(--text-primary); border-color: var(--border-color);">' +
+                            escapeHtml(p.subdomain) +
+                        '</a>' +
+                    '</div>';
+                }
+
+                if (hasNote) {
+                    html += '<div class="resource-meta-row resource-note-text" title="' + safeNote + '">' +
+                        '<i class="ti ti-notes"></i>' +
+                        '<span>' + safeNote + '</span>' +
                     '</div>';
                 }
 
@@ -3761,57 +3810,99 @@ CF_ACCOUNT_NAME_1=main</p>
             }
         }
 
-        // Worker Metadata Modal functions
-        function openEditWorkerMetaModal(accountId, workerId) {
+        // Worker & Pages Metadata Modal functions
+        function openEditResourceMetaModal(accountId, resourceId, resourceType = 'worker') {
             if (!requireUnlock()) return;
 
             document.getElementById('edit-worker-account-id').value = accountId;
-            document.getElementById('edit-worker-id').value = workerId;
-            document.getElementById('edit-worker-name-display').textContent = workerId;
+            document.getElementById('edit-worker-id').value = resourceId;
+            document.getElementById('edit-resource-type').value = resourceType;
+            document.getElementById('edit-worker-name-display').textContent = resourceId;
+
+            const modalTitleEl = document.getElementById('resource-modal-title-text');
+            const labelEl = document.getElementById('edit-resource-label-display');
+            if (resourceType === 'pages') {
+                if (modalTitleEl) {
+                    modalTitleEl.setAttribute('data-i18n', 'page-meta-modal-title');
+                    modalTitleEl.textContent = translations[currentLang]['page-meta-modal-title'] || 'Pages Project & Notes';
+                }
+                if (labelEl) {
+                    labelEl.setAttribute('data-i18n', 'page-label');
+                    labelEl.textContent = translations[currentLang]['page-label'] || 'Pages Project';
+                }
+            } else {
+                if (modalTitleEl) {
+                    modalTitleEl.setAttribute('data-i18n', 'worker-meta-modal-title');
+                    modalTitleEl.textContent = translations[currentLang]['worker-meta-modal-title'] || 'Worker Project & Notes';
+                }
+                if (labelEl) {
+                    labelEl.setAttribute('data-i18n', 'worker-label');
+                    labelEl.textContent = translations[currentLang]['worker-label'] || 'Worker ID';
+                }
+            }
 
             // Pre-fill existing metadata if available
             const cachedRes = cachedAccountResources.get(accountId);
-            const targetWorker = (cachedRes?.workers || []).find(w => w.id === workerId);
+            let targetItem = null;
+            if (resourceType === 'pages') {
+                targetItem = (cachedRes?.pages || []).find(p => p.name === resourceId);
+            } else {
+                targetItem = (cachedRes?.workers || []).find(w => w.id === resourceId);
+            }
 
-            document.getElementById('worker-repo-input').value = targetWorker?.repo_url || '';
-            document.getElementById('worker-note-input').value = targetWorker?.note || '';
+            document.getElementById('worker-repo-input').value = targetItem?.repo_url || '';
+            document.getElementById('worker-note-input').value = targetItem?.note || '';
 
             openModal('edit-worker-meta-modal');
         }
 
+        // Backward compatibility
+        function openEditWorkerMetaModal(accountId, workerId) {
+            openEditResourceMetaModal(accountId, workerId, 'worker');
+        }
+
         async function saveWorkerMetadata() {
             const accountId = document.getElementById('edit-worker-account-id').value;
-            const workerId = document.getElementById('edit-worker-id').value;
+            const resourceId = document.getElementById('edit-worker-id').value;
+            const resourceType = document.getElementById('edit-resource-type').value || 'worker';
             const repoUrl = document.getElementById('worker-repo-input').value.trim();
             const note = document.getElementById('worker-note-input').value.trim();
 
-            if (!accountId || !workerId) return;
+            if (!accountId || !resourceId) return;
+
+            const endpoint = resourceType === 'pages' ? '/api/pages-meta' : '/api/worker-meta';
+            const payload = resourceType === 'pages'
+                ? { account_id: accountId, project_name: resourceId, repo_url: repoUrl, note: note }
+                : { account_id: accountId, worker_id: resourceId, repo_url: repoUrl, note: note };
 
             try {
-                const res = await fetch('/api/worker-meta', {
+                const res = await fetch(endpoint, {
                     method: 'POST',
                     headers: getAuthHeader(),
-                    body: JSON.stringify({
-                        account_id: accountId,
-                        worker_id: workerId,
-                        repo_url: repoUrl,
-                        note: note
-                    })
+                    body: JSON.stringify(payload)
                 });
 
                 if (!res.ok) {
                     const err = await res.json().catch(() => ({ error: 'Request failed' }));
-                    alert('Error saving worker metadata: ' + (err.error || res.statusText));
+                    alert('Error saving metadata: ' + (err.error || res.statusText));
                     return;
                 }
 
                 // Update client cache
                 const cached = cachedAccountResources.get(accountId);
-                if (cached && Array.isArray(cached.workers)) {
-                    const w = cached.workers.find(item => item.id === workerId);
-                    if (w) {
-                        w.repo_url = repoUrl;
-                        w.note = note;
+                if (cached) {
+                    if (resourceType === 'pages' && Array.isArray(cached.pages)) {
+                        const p = cached.pages.find(item => item.name === resourceId);
+                        if (p) {
+                            p.repo_url = repoUrl;
+                            p.note = note;
+                        }
+                    } else if (Array.isArray(cached.workers)) {
+                        const w = cached.workers.find(item => item.id === resourceId);
+                        if (w) {
+                            w.repo_url = repoUrl;
+                            w.note = note;
+                        }
                     }
                 }
 
@@ -4368,12 +4459,13 @@ async function handleRequest(request, env, ctx) {
         "Content-Type": "application/json"
       };
 
-      // Fetch workers, pages, and account subdomain in parallel with graceful error handling
-      const [workersRes, pagesRes, subdomainRes, workersMeta] = await Promise.allSettled([
+      // Fetch workers, pages, account subdomain, and custom metadata in parallel with graceful error handling
+      const [workersRes, pagesRes, subdomainRes, workersMeta, pagesMeta] = await Promise.allSettled([
         fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts`, { headers }),
         fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects`, { headers }),
         fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/subdomain`, { headers }),
-        getWorkersMeta(accountId, env)
+        getWorkersMeta(accountId, env),
+        getPagesMeta(accountId, env)
       ]);
 
       let accountSubdomain = "";
@@ -4387,6 +4479,7 @@ async function handleRequest(request, env, ctx) {
       }
 
       const metaMap = (workersMeta.status === "fulfilled" && workersMeta.value) ? workersMeta.value : {};
+      const pagesMetaMap = (pagesMeta.status === "fulfilled" && pagesMeta.value) ? pagesMeta.value : {};
 
       const result = {
         subdomain: accountSubdomain,
@@ -4427,12 +4520,15 @@ async function handleRequest(request, env, ctx) {
               if (Array.isArray(p.domains)) {
                 p.domains.forEach(d => { if (!aliases.includes(d)) aliases.push(d); });
               }
+              const customMeta = pagesMetaMap[p.name] || {};
               return {
                 name: p.name,
                 subdomain: p.subdomain,
                 created_on: p.created_on,
                 modified_on: lastDeployed,
-                domains: aliases
+                domains: aliases,
+                repo_url: customMeta.repo_url || "",
+                note: customMeta.note || ""
               };
             });
           }
@@ -4498,6 +4594,58 @@ async function handleRequest(request, env, ctx) {
         });
       } catch (e) {
         return new Response(JSON.stringify({ success: false, error: "Error saving worker meta: " + e.message }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
+    if (url.pathname === "/api/pages-meta") {
+      if (request.method !== "POST") {
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+      if (!await verifyPassword(request, env)) {
+        return new Response(JSON.stringify({ success: false, error: "Unauthorized or admin password not configured." }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      try {
+        const body = await request.json();
+        const { account_id, project_name, repo_url, note } = body;
+        if (!account_id || !project_name) {
+          return new Response(JSON.stringify({ success: false, error: "account_id and project_name are required." }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        if (!env.CF_USAGE_KV) {
+          return new Response(JSON.stringify({ success: false, error: "KV namespace (CF_USAGE_KV) is not bound." }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        const currentMeta = await getPagesMeta(account_id, env);
+        currentMeta[project_name] = {
+          repo_url: formatExternalUrl(repo_url || ""),
+          note: (note || "").trim()
+        };
+
+        await env.CF_USAGE_KV.put("PAGES_META_" + account_id, JSON.stringify(currentMeta));
+
+        // Invalidate resources cache for this account so new meta appears immediately
+        try {
+          await env.CF_USAGE_KV.delete("RES_" + account_id);
+        } catch (e) {}
+
+        return new Response(JSON.stringify({ success: true, meta: currentMeta[project_name] }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ success: false, error: "Error saving pages meta: " + e.message }), {
           status: 500,
           headers: { "Content-Type": "application/json" }
         });
@@ -4617,13 +4765,17 @@ async function handleRequest(request, env, ctx) {
           for (const p of pages) {
             const name = (p.name || "").toLowerCase();
             const domains = (p.domains || []).join(" ").toLowerCase();
+            const repo = (p.repo_url || "").toLowerCase();
+            const note = (p.note || "").toLowerCase();
 
-            if (name.includes(projectQuery) || domains.includes(projectQuery)) {
+            if (name.includes(projectQuery) || domains.includes(projectQuery) || repo.includes(projectQuery) || note.includes(projectQuery)) {
               matches.push({
                 type: "pages",
                 account_id: acc.account_id,
                 account_name: acc.name,
                 pages_name: p.name,
+                repo_url: p.repo_url || "",
+                note: p.note || "",
                 domains: p.domains,
                 subdomain: p.subdomain,
                 modified_on: p.modified_on
